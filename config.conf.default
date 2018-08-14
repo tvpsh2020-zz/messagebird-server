@@ -1,0 +1,9 @@
+[server]
+mode=staging
+port=8080
+
+[staging]
+accessKey=test_gshuPaZoeEG6ovbc8M79w0QyM
+
+[live]
+accessKey=
