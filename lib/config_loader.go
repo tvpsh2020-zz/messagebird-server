@@ -10,9 +10,9 @@ import (
 )
 
 type ServerConfig struct {
-	ServerMode string
-	Port       string
-	AccessKey  string
+	ServerMode *string
+	Port       *string
+	AccessKey  *string
 }
 
 var GlobalConfigFilePath = "./config.conf"
@@ -49,27 +49,31 @@ func loadConfig() {
 			if currentPosition == "server" {
 				if param == "mode" {
 					arg := validContent.ReplaceAllString(scanner.Text(), "$3")
-					GlobalConfig.ServerMode = arg
+					GlobalConfig.ServerMode = &arg
 				}
 
 				if param == "port" {
 					arg := validContent.ReplaceAllString(scanner.Text(), "$3")
-					GlobalConfig.Port = arg
+					GlobalConfig.Port = &arg
 				}
 			}
 
-			if currentPosition == GlobalConfig.ServerMode {
+			if currentPosition == *GlobalConfig.ServerMode {
 				if param == "accessKey" {
 					arg := validContent.ReplaceAllString(scanner.Text(), "$3")
-					GlobalConfig.AccessKey = arg
+					GlobalConfig.AccessKey = &arg
 				}
 			}
 		}
 	}
+
+	if GlobalConfig.ServerMode == nil || GlobalConfig.Port == nil {
+		panic("Server initial argument not enough.")
+	}
 }
 
 func loadMessageBirdInstance() {
-	MBClient = messagebird.NewV2(GlobalConfig.AccessKey)
+	MBClient = messagebird.NewV2(*GlobalConfig.AccessKey)
 }
 
 func AppInitialize() {

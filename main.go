@@ -9,21 +9,6 @@ import (
 	"github.com/tvpsh2020/messagebird-server/lib"
 )
 
-/*
-TODO
-
-1. receive msg from my api
-2. body check: >160 (or unicode > 70) should be split (how to let server know this is a split SMS?)
-3. body check: cannot be empty
-4. body check: invalid word
-5. maximum split SMS is 255
-6. MessageBird API can only accept 1 req per second, let all received messages be handle in queue
-7. refactor into OOP
-8. make a http route to handle flexible uri pattern
-9. make config loader easy to add-on
-
-*/
-
 func init() {
 	lib.AppInitialize()
 }
@@ -33,7 +18,7 @@ func main() {
 	http.HandleFunc("/api/message", sendMessageHandler)
 	http.HandleFunc("/api/balance", getBalanceHandler)
 	http.HandleFunc("/api/test", apiTestHandler)
-	http.ListenAndServe(":"+lib.GlobalConfig.Port, nil)
+	http.ListenAndServe(":"+*lib.GlobalConfig.Port, nil)
 }
 
 type APIResponse struct {
