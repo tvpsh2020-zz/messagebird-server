@@ -1,6 +1,6 @@
 # Jimmmmy SMS Server
 
-This is a 3rd party server for sending SMS by integrate MessageBird service. The progress is about 20% now.
+This is a 3rd party server for sending SMS by integrate MessageBird service. The progress is about 50% now.
 
 # Developer memo
 
@@ -21,18 +21,15 @@ This is a 3rd party server for sending SMS by integrate MessageBird service. The
 - Get balance from MessageBird
 - Send test message for testing connection with MessageBird
 - Send message from server
+- MessageBird can only accept 1 req per second, let all received messages be stored in a queue
+- Make a http route to handle flexible uri pattern
+- Make a task management to handle whole server event
+- Make config loader easy to load and easy to add new parameter
 
 ## Todo
 
+- Message body check: message body contain unicode or only plain
 - Message body check: > 160 (or unicode > 70) should be split
 - Message body check: should not be empty
 - Message body check: invalid word
-- MessageBird can only accept 1 req per second, let all received messages be stored in a queue
-- Make a http route to handle flexible uri pattern
-- Make config loader easy to add new parameter
 - (Last step) Refactor into OOP
-
-## Research
-
-- How to let server know this is a split SMS?
-- The default maximum split of message is 9, is this rule can be broke with my own UDH (e.g. I set UDH that message split up to 20 parts)

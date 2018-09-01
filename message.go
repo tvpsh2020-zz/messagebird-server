@@ -2,66 +2,72 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/tvpsh2020/messagebird-server/lib"
+	"sync"
 
 	messagebird "github.com/messagebird/go-rest-api"
 )
 
-func SMSSendTest() *messagebird.Message {
-	params := &messagebird.MessageParams{Reference: "MyReference"}
-
-	message, err := lib.MBClient.NewMessage(
-		"Jimmy",
-		[]string{"886931077193"},
-		"Hi There.",
-		params)
-
-	if err != nil {
-		if err == messagebird.ErrResponse {
-			for _, mbError := range message.Errors {
-				fmt.Printf("Error: %#v\n", mbError)
-			}
-
-			return nil
-		}
-
-		fmt.Println(err)
-		return nil
-	}
-
-	fmt.Println(message)
-
-	return message
+type RawMessageBody struct {
+	Recipients string
+	Originator string
+	Body       string
 }
 
-func SendSMSToMessageBird(sms *SendMessageBody) *messagebird.Message {
-	params := &messagebird.MessageParams{Reference: "MyReference"}
+type Message struct {
+	Originator string
+	Body       string
+	Recipients []string
+	Params     messagebird.MessageParams
+}
 
-	fmt.Println(sms.Originator)
-	fmt.Println(sms.Recipients)
-	fmt.Println(sms.Body)
+// var MessageQueue []Message
 
-	message, err := lib.MBClient.NewMessage(
-		sms.Originator,
-		[]string{sms.Recipients},
-		sms.Body,
-		params)
+type messageQueue struct {
+	sync.RWMutex
+	List []Message
+}
+
+var MessageQueue = new(messageQueue)
+
+func StoreMessageToQueue(message *RawMessageBody) (*apiResponse, error) {
+	// split to an array
+
+	messageBuilder := &MessageBuilder{RawMessageBody: message}
+	messages := messageBuilder.start()
+
+	// send to queue,
+
+	MessageQueue.Lock()
+
+	for _, message := range messages {
+		MessageQueue.List = append(MessageQueue.List, message)
+	}
+
+	MessageQueue.Unlock()
+
+	tmpResult := &apiResponse{
+		Result: "OK.",
+	}
+
+	return tmpResult, nil
+}
+
+func SendSMSToMessageBirdV2(message Message) {
+
+	newMessage, err := mbClient.NewMessage(
+		message.Originator,
+		message.Recipients,
+		message.Body,
+		&message.Params)
 
 	if err != nil {
 		if err == messagebird.ErrResponse {
-			for _, mbError := range message.Errors {
+			for _, mbError := range newMessage.Errors {
 				fmt.Printf("Error: %#v\n", mbError)
 			}
-
-			return nil
 		}
 
 		fmt.Println(err)
-		return nil
 	}
 
-	fmt.Println(message)
-
-	return message
 }

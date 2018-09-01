@@ -1,0 +1,16 @@
+{
+	"server": {
+		"mode": "staging",
+		"port": "8080"
+	},
+	"staging": {
+		"accessKey": "test_gshuPaZoeEG6ovbc8M79w0QyM",
+		"checkMessageQueueTimeInSec": "1",
+		"storage": "local"
+	},
+	"live": {
+		"accessKey": "",
+		"checkMessageQueueTimeInSec": "1",
+		"storage": "local"
+	}
+}
