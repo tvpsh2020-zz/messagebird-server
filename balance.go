@@ -4,21 +4,20 @@ import (
 	"fmt"
 
 	messagebird "github.com/messagebird/go-rest-api"
+	"github.com/messagebird/go-rest-api/balance"
 )
 
-func getBalance() *messagebird.Balance {
-	balance, err := mbClient.Balance()
+func getBalance() *balance.Balance {
+	balance, err := balance.Read(mbClient)
 
 	if err != nil {
-		if err == messagebird.ErrResponse {
-			for _, mbError := range balance.Errors {
+		switch errResp := err.(type) {
+		case messagebird.ErrorResponse:
+			for _, mbError := range errResp.Errors {
 				fmt.Printf("Error: %#v\n", mbError)
 			}
-
-			return nil
 		}
 
-		fmt.Println(err)
 		return nil
 	}
 

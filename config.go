@@ -36,7 +36,7 @@ func loadConfig() {
 }
 
 func loadMessageBirdInstance() {
-	mbClient = messagebird.NewV2(config[serverMode]["accessKey"])
+	mbClient = messagebird.New(config[serverMode]["accessKey"])
 }
 
 func initConfig() {

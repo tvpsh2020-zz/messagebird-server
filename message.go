@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	messagebird "github.com/messagebird/go-rest-api"
+	"github.com/messagebird/go-rest-api/sms"
 )
 
 type RawMessageBody struct {
@@ -17,7 +18,7 @@ type Message struct {
 	Originator string
 	Body       string
 	Recipients []string
-	Params     messagebird.MessageParams
+	Params     sms.Params
 }
 
 // var MessageQueue []Message
@@ -54,20 +55,23 @@ func StoreMessageToQueue(message *RawMessageBody) (*apiResponse, error) {
 
 func SendSMSToMessageBirdV2(message Message) {
 
-	newMessage, err := mbClient.NewMessage(
+	newMessage, err := sms.Create(
+		mbClient,
 		message.Originator,
 		message.Recipients,
 		message.Body,
 		&message.Params)
 
 	if err != nil {
-		if err == messagebird.ErrResponse {
-			for _, mbError := range newMessage.Errors {
+		switch errResp := err.(type) {
+		case messagebird.ErrorResponse:
+			for _, mbError := range errResp.Errors {
 				fmt.Printf("Error: %#v\n", mbError)
 			}
 		}
 
-		fmt.Println(err)
+		return
 	}
 
+	fmt.Println(newMessage)
 }

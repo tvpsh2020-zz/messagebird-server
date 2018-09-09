@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
-	messagebird "github.com/messagebird/go-rest-api"
+	"github.com/messagebird/go-rest-api/sms"
 )
 
 type MessageBuilder struct {
 	RawMessageBody *RawMessageBody
 	Recipients     []string
-	Params         messagebird.MessageParams
+	Params         sms.Params
 	BodyLength     int
 	SplitParts     int
 	SplitPartSize  int
@@ -36,7 +36,7 @@ var singleSMSLength = map[string]int{
 }
 
 func (mb *MessageBuilder) constructor() {
-	mb.Params = messagebird.MessageParams{
+	mb.Params = sms.Params{
 		Type: "binary",
 	}
 }
@@ -71,7 +71,7 @@ func (mb *MessageBuilder) buildMessages() []Message {
 	referenceNum := rand.Intn(256)
 
 	for i := 0; i < mb.SplitParts; i++ {
-		typeDetails := make(messagebird.TypeDetails)
+		typeDetails := make(sms.TypeDetails)
 		typeDetails["udh"] = fmt.Sprintf("050003%02x%02x%02x", referenceNum, mb.SplitParts, i+1)
 
 		mb.Params.TypeDetails = typeDetails
