@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/rand"
+	"regexp"
 	"strings"
 	"time"
 
@@ -10,12 +13,12 @@ import (
 )
 
 type MessageBuilder struct {
-	RawMessageBody *RawMessageBody
-	Recipients     []string
-	Params         sms.Params
-	BodyLength     int
-	SplitParts     int
-	SplitPartSize  int
+	RawMessage    *RawMessage
+	Recipients    []string
+	Params        sms.Params
+	BodyLength    int
+	SplitParts    int
+	SplitPartSize int
 }
 
 const (
@@ -35,19 +38,35 @@ var singleSMSLength = map[string]int{
 	"unicode": UnicodeSMSLength,
 }
 
-func (mb *MessageBuilder) constructor() {
-	mb.Params = sms.Params{
-		Type: "binary",
+func (mb *MessageBuilder) validateOriginator() error {
+	if !regexp.MustCompile(`^[a-zA-Z0-9]{1,11}$`).MatchString(mb.RawMessage.Originator) {
+		return errors.New("originator is illegal")
 	}
+
+	return nil
 }
 
-func (mb *MessageBuilder) splitRecipients() {
-	removeWhiteSpace := strings.Replace(mb.RawMessageBody.Recipients, " ", "", -1)
+func (mb *MessageBuilder) splitRecipients() error {
+	// var rule = regexp.MustCompile(`[0-9]*\,*`)
+	// var result string
+
+	// for _, match := range re.FindAllString(str, -1) {
+	// 	if len(match) > 0 {
+	// 		fmt.Println(match, "found at index", i)
+	// 		result += match
+	// 	}
+
+	// }
+
+	removeWhiteSpace := strings.Replace(mb.RawMessage.Recipients, " ", "", -1)
 	mb.Recipients = strings.Split(removeWhiteSpace, ",")
+	return nil
 }
 
 func (mb *MessageBuilder) countBody() {
-	mb.BodyLength = len(mb.RawMessageBody.Body)
+	mb.BodyLength = len(mb.RawMessage.Body)
+
+	// check empty body
 
 	// if is plain text, set here
 	mb.Params.DataCoding = "plain"
@@ -63,6 +82,15 @@ func (mb *MessageBuilder) countBody() {
 		mb.SplitPartSize = singleSMSLength[mb.Params.DataCoding]
 		mb.SplitParts = 1
 	}
+
+	fmt.Println("Count -> ", mb.BodyLength)
+}
+
+func (mb *MessageBuilder) stringToBinary(str string) string {
+	src := []byte(str)
+	encodedStr := hex.EncodeToString(src)
+
+	return encodedStr
 }
 
 func (mb *MessageBuilder) buildMessages() []Message {
@@ -79,18 +107,18 @@ func (mb *MessageBuilder) buildMessages() []Message {
 		_body := ""
 
 		if mb.SplitParts == 1 {
-			_body = mb.RawMessageBody.Body
+			_body = mb.RawMessage.Body
 		} else {
-			if len(mb.RawMessageBody.Body[i*mb.SplitPartSize:]) < mb.SplitPartSize {
-				_body = mb.RawMessageBody.Body[i*mb.SplitPartSize:]
+			if len(mb.RawMessage.Body[i*mb.SplitPartSize:]) < mb.SplitPartSize {
+				_body = mb.RawMessage.Body[i*mb.SplitPartSize:]
 			} else {
-				_body = mb.RawMessageBody.Body[i*mb.SplitPartSize : (i+1)*mb.SplitPartSize]
+				_body = mb.RawMessage.Body[i*mb.SplitPartSize : (i+1)*mb.SplitPartSize]
 			}
 		}
 
 		_result := &Message{
-			Originator: mb.RawMessageBody.Originator,
-			Body:       _body,
+			Originator: mb.RawMessage.Originator,
+			Body:       mb.stringToBinary(_body),
 			Recipients: mb.Recipients,
 			Params:     mb.Params,
 		}
@@ -101,10 +129,13 @@ func (mb *MessageBuilder) buildMessages() []Message {
 	return result
 }
 
-func (mb *MessageBuilder) start() []Message {
-	mb.constructor()
+func (mb *MessageBuilder) start() ([]Message, error) {
+	if err := mb.validateOriginator(); err != nil {
+		return nil, err
+	}
+
 	mb.splitRecipients()
 	mb.countBody()
 
-	return mb.buildMessages()
+	return mb.buildMessages(), nil
 }

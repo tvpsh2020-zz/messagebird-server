@@ -1,6 +1,6 @@
 # Jimmmmy SMS Server
 
-Sending SMS by integrate MessageBird service. The progress is about 50% now.
+Sending SMS by integrate MessageBird service. The progress is about 80% now.
 
 ## Requirements
 
@@ -39,11 +39,17 @@ $ go get github.com/tvpsh2020/messagebird-server
 - Make a task management to handle whole server event
 - Make config loader easy to load and easy to add new parameter
 - Update MessageBird API from v4 to v5
+- Fit message body to hex
+- Filter message originator
 
 ### Todo
 
+- Validate recipients
 - Message body check: message body contain unicode or only plain
 - Message body check: > 160 (or unicode > 70) should be split
 - Message body check: should not be empty
 - Message body check: invalid word
+- API validate
+- Uniform API log
+- Test
 - (Last step) Refactor into OOP

@@ -8,15 +8,15 @@ import (
 	"strings"
 )
 
-type Route struct {
+type route struct {
 	Method  string
 	URI     string
 	Handler http.HandlerFunc
 }
 
-var routes = []Route{
-	Route{"POST", "/api/message", sendMessageHandler},
-	Route{"GET", "/api/balance", getBalanceHandler},
+var routes = []route{
+	route{"POST", "/api/message", sendMessageHandler},
+	route{"GET", "/api/balance", getBalanceHandler},
 }
 
 type apiResponse struct {
@@ -33,12 +33,9 @@ func initRouter() {
 
 		for _, route := range routes {
 			if url == route.URI && req.Method == route.Method {
-
 				route.Handler.ServeHTTP(res, req)
-
 				return
 			}
-
 		}
 
 		tmpResult := &apiResponse{
@@ -52,27 +49,31 @@ func initRouter() {
 }
 
 func sendMessageHandler(res http.ResponseWriter, req *http.Request) {
-	// 1. translate body
-	var rawMessageBody RawMessageBody
+	var rawMessage *RawMessage
 
-	if err := json.NewDecoder(req.Body).Decode(&rawMessageBody); err != nil {
+	if err := json.NewDecoder(req.Body).Decode(&rawMessage); err != nil {
 		http.Error(res, err.Error(), 400)
 		log.Printf("%#v\n", err)
 		return
 	}
 
-	// 2. validate all content
+	if err := StoreMessageToQueue(rawMessage); err != nil {
+		log.Println()
+		tmpResult := &apiResponse{
+			Result: err.Error(),
+		}
 
-	// 3. store into message queue
-	result, err := StoreMessageToQueue(&rawMessageBody)
+		customRes, _ := json.Marshal(tmpResult)
+		res.Write(customRes)
+	} else {
+		tmpResult := &apiResponse{
+			Result: "OK",
+		}
 
-	if err != nil {
-		return
+		customRes, _ := json.Marshal(tmpResult)
+		res.Write(customRes)
 	}
 
-	customRes, _ := json.Marshal(result)
-
-	res.Write(customRes)
 }
 
 func getBalanceHandler(res http.ResponseWriter, req *http.Request) {

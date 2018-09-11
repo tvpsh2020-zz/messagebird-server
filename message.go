@@ -1,14 +1,14 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"sync"
 
 	messagebird "github.com/messagebird/go-rest-api"
 	"github.com/messagebird/go-rest-api/sms"
 )
 
-type RawMessageBody struct {
+type RawMessage struct {
 	Recipients string
 	Originator string
 	Body       string
@@ -21,8 +21,6 @@ type Message struct {
 	Params     sms.Params
 }
 
-// var MessageQueue []Message
-
 type messageQueue struct {
 	sync.RWMutex
 	List []Message
@@ -30,13 +28,28 @@ type messageQueue struct {
 
 var MessageQueue = new(messageQueue)
 
-func StoreMessageToQueue(message *RawMessageBody) (*apiResponse, error) {
-	// split to an array
+func StoreMessageToQueue(rawMessage *RawMessage) error {
 
-	messageBuilder := &MessageBuilder{RawMessageBody: message}
-	messages := messageBuilder.start()
+	// Validate or Error
 
-	// send to queue,
+	// var validator *Validator
+
+	// if err := validator.validate(rawMessage); err != nil {
+
+	// }
+
+	messageBuilder := &MessageBuilder{
+		RawMessage: rawMessage,
+		Params: sms.Params{
+			Type:       "binary",
+			DataCoding: "",
+		},
+	}
+	messages, err := messageBuilder.start()
+
+	if err != nil {
+		return err
+	}
 
 	MessageQueue.Lock()
 
@@ -45,12 +58,7 @@ func StoreMessageToQueue(message *RawMessageBody) (*apiResponse, error) {
 	}
 
 	MessageQueue.Unlock()
-
-	tmpResult := &apiResponse{
-		Result: "OK.",
-	}
-
-	return tmpResult, nil
+	return nil
 }
 
 func SendSMSToMessageBirdV2(message Message) {
@@ -66,12 +74,12 @@ func SendSMSToMessageBirdV2(message Message) {
 		switch errResp := err.(type) {
 		case messagebird.ErrorResponse:
 			for _, mbError := range errResp.Errors {
-				fmt.Printf("Error: %#v\n", mbError)
+				log.Printf("Error: %#v\n", mbError)
 			}
 		}
 
 		return
 	}
 
-	fmt.Println(newMessage)
+	log.Printf("newMessage -> %#v ", newMessage)
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 
@@ -23,7 +22,7 @@ func loadConfig() {
 	defer configFile.Close()
 
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
