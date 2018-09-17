@@ -8,38 +8,33 @@ import (
 	"github.com/messagebird/go-rest-api/sms"
 )
 
-type RawMessage struct {
+// IRawMessage is an interface for raw message
+type IRawMessage struct {
 	Recipients string
 	Originator string
 	Body       string
 }
 
-type Message struct {
+// IMessage is an interface for a single message
+type IMessage struct {
 	Originator string
 	Body       string
 	Recipients []string
 	Params     sms.Params
 }
 
-type messageQueue struct {
+// IMessageQueue is an interface for message queue
+type IMessageQueue struct {
 	sync.RWMutex
-	List []Message
+	List []IMessage
 }
 
-var MessageQueue = new(messageQueue)
+// MessageQueue is global access message queue instance
+var MessageQueue = new(IMessageQueue)
 
-func StoreMessageToQueue(rawMessage *RawMessage) error {
-
-	// Validate or Error
-
-	// var validator *Validator
-
-	// if err := validator.validate(rawMessage); err != nil {
-
-	// }
-
-	messageBuilder := &MessageBuilder{
-		RawMessage: rawMessage,
+func StoreMessageToQueue(rawMessage *IRawMessage) error {
+	messageBuilder := &IMessageBuilder{
+		IRawMessage: rawMessage,
 		Params: sms.Params{
 			Type:       "binary",
 			DataCoding: "",
@@ -61,7 +56,7 @@ func StoreMessageToQueue(rawMessage *RawMessage) error {
 	return nil
 }
 
-func SendSMSToMessageBirdV2(message Message) {
+func SendSMSToMessageBirdV2(message IMessage) {
 
 	newMessage, err := sms.Create(
 		mbClient,

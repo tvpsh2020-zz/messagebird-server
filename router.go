@@ -49,7 +49,7 @@ func initRouter() {
 }
 
 func sendMessageHandler(res http.ResponseWriter, req *http.Request) {
-	var rawMessage *RawMessage
+	var rawMessage *IRawMessage
 
 	if err := json.NewDecoder(req.Body).Decode(&rawMessage); err != nil {
 		http.Error(res, err.Error(), 400)

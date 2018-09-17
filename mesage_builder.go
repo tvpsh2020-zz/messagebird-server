@@ -4,16 +4,19 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/messagebird/go-rest-api/sms"
+	"github.com/tvpsh2020/messagebird-server/consts"
 )
 
-type MessageBuilder struct {
-	RawMessage    *RawMessage
+// IMessageBuilder is an interface for message builder
+type IMessageBuilder struct {
+	IRawMessage   *IRawMessage
 	Recipients    []string
 	Params        sms.Params
 	BodyLength    int
@@ -21,55 +24,86 @@ type MessageBuilder struct {
 	SplitPartSize int
 }
 
-const (
-	PlainSMSLength    = 160
-	PlainCSMSLength   = 153
-	UnicodeSMSLength  = 70
-	UnicodeCSMSLength = 67
-)
-
 var concatenatedSMSLength = map[string]int{
-	"plain":   PlainCSMSLength,
-	"unicode": UnicodeCSMSLength,
+	"plain":   consts.PlainCSMSLength,
+	"unicode": consts.UnicodeCSMSLength,
 }
 
 var singleSMSLength = map[string]int{
-	"plain":   PlainSMSLength,
-	"unicode": UnicodeSMSLength,
+	"plain":   consts.PlainSMSLength,
+	"unicode": consts.UnicodeSMSLength,
 }
 
-func (mb *MessageBuilder) validateOriginator() error {
-	if !regexp.MustCompile(`^[a-zA-Z0-9]{1,11}$`).MatchString(mb.RawMessage.Originator) {
+func (mb *IMessageBuilder) validateOriginator() error {
+	if !regexp.MustCompile(consts.OriginatorRegex).MatchString(mb.IRawMessage.Originator) {
 		return errors.New("originator is illegal")
 	}
 
 	return nil
 }
 
-func (mb *MessageBuilder) splitRecipients() error {
-	// var rule = regexp.MustCompile(`[0-9]*\,*`)
-	// var result string
+func (mb *IMessageBuilder) fixRecipients() string {
+	var regex = regexp.MustCompile(consts.RecipientsRegex)
+	var validatedString string
 
-	// for _, match := range re.FindAllString(str, -1) {
-	// 	if len(match) > 0 {
-	// 		fmt.Println(match, "found at index", i)
-	// 		result += match
-	// 	}
+	for _, match := range regex.FindAllString(mb.IRawMessage.Recipients, -1) {
+		if len(match) > 0 {
+			validatedString += match
+		}
+	}
 
-	// }
+	fixedRecipients := strings.Replace(validatedString, " ", "", -1)
+	return fixedRecipients
+}
 
-	removeWhiteSpace := strings.Replace(mb.RawMessage.Recipients, " ", "", -1)
-	mb.Recipients = strings.Split(removeWhiteSpace, ",")
+func (mb *IMessageBuilder) splitRecipients() error {
+	fixedRecipients := mb.fixRecipients()
+	splitWithComma := strings.Split(fixedRecipients, ",")
+
+	var result []string
+
+	for _, str := range splitWithComma {
+		if str != "" {
+			result = append(result, str)
+		}
+	}
+
+	if len(result) == 0 {
+		return errors.New("recipients is illegal")
+	}
+
+	mb.Recipients = result
+
 	return nil
 }
 
-func (mb *MessageBuilder) countBody() {
-	mb.BodyLength = len(mb.RawMessage.Body)
+func (mb *IMessageBuilder) checkDataCoding() {
+	var regex = regexp.MustCompile(consts.GSM0338Regex)
 
-	// check empty body
+	for _, match := range regex.FindAllString(mb.IRawMessage.Body, -1) {
+		if len(match) > 0 {
+			mb.Params.DataCoding = consts.Unicode
+			log.Println("DataCoding: ", mb.Params.DataCoding)
+			return
+		}
+	}
 
-	// if is plain text, set here
-	mb.Params.DataCoding = "plain"
+	mb.Params.DataCoding = consts.Plain
+
+	log.Println("DataCoding: ", mb.Params.DataCoding)
+}
+
+func (mb *IMessageBuilder) countBody() error {
+
+	mb.IRawMessage.Body = strings.TrimSpace(mb.IRawMessage.Body)
+
+	mb.BodyLength = len(mb.IRawMessage.Body)
+
+	if mb.BodyLength == 0 {
+		return errors.New("message content is illegal")
+	}
+
+	mb.checkDataCoding()
 
 	if mb.BodyLength > singleSMSLength[mb.Params.DataCoding] {
 		mb.SplitPartSize = concatenatedSMSLength[mb.Params.DataCoding]
@@ -84,17 +118,18 @@ func (mb *MessageBuilder) countBody() {
 	}
 
 	fmt.Println("Count -> ", mb.BodyLength)
+	return nil
 }
 
-func (mb *MessageBuilder) stringToBinary(str string) string {
+func (mb *IMessageBuilder) stringToBinary(str string) string {
 	src := []byte(str)
 	encodedStr := hex.EncodeToString(src)
 
 	return encodedStr
 }
 
-func (mb *MessageBuilder) buildMessages() []Message {
-	var result []Message
+func (mb *IMessageBuilder) buildMessages() []IMessage {
+	var result []IMessage
 	rand.Seed(time.Now().UTC().UnixNano())
 	referenceNum := rand.Intn(256)
 
@@ -107,18 +142,19 @@ func (mb *MessageBuilder) buildMessages() []Message {
 		_body := ""
 
 		if mb.SplitParts == 1 {
-			_body = mb.RawMessage.Body
+			_body = mb.IRawMessage.Body
 		} else {
-			if len(mb.RawMessage.Body[i*mb.SplitPartSize:]) < mb.SplitPartSize {
-				_body = mb.RawMessage.Body[i*mb.SplitPartSize:]
+			if len(mb.IRawMessage.Body[i*mb.SplitPartSize:]) < mb.SplitPartSize {
+				_body = mb.IRawMessage.Body[i*mb.SplitPartSize:]
 			} else {
-				_body = mb.RawMessage.Body[i*mb.SplitPartSize : (i+1)*mb.SplitPartSize]
+				_body = mb.IRawMessage.Body[i*mb.SplitPartSize : (i+1)*mb.SplitPartSize]
 			}
 		}
 
-		_result := &Message{
-			Originator: mb.RawMessage.Originator,
-			Body:       mb.stringToBinary(_body),
+		_result := &IMessage{
+			Originator: mb.IRawMessage.Originator,
+			// Body:       mb.stringToBinary(_body),
+			Body:       _body,
 			Recipients: mb.Recipients,
 			Params:     mb.Params,
 		}
@@ -129,13 +165,18 @@ func (mb *MessageBuilder) buildMessages() []Message {
 	return result
 }
 
-func (mb *MessageBuilder) start() ([]Message, error) {
+func (mb *IMessageBuilder) start() ([]IMessage, error) {
 	if err := mb.validateOriginator(); err != nil {
 		return nil, err
 	}
 
-	mb.splitRecipients()
-	mb.countBody()
+	if err := mb.splitRecipients(); err != nil {
+		return nil, err
+	}
+
+	if err := mb.countBody(); err != nil {
+		return nil, err
+	}
 
 	return mb.buildMessages(), nil
 }
