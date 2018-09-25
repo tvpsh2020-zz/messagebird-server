@@ -4,13 +4,9 @@
 		"port": "8080"
 	},
 	"staging": {
-		"accessKey": "test_gshuPaZoeEG6ovbc8M79w0QyM",
-		"checkMessageQueueTimeInSec": "1",
-		"storage": "local"
+		"accessKey": "test_gshuPaZoeEG6ovbc8M79w0QyM"
 	},
 	"live": {
-		"accessKey": "",
-		"checkMessageQueueTimeInSec": "1",
-		"storage": "local"
+		"accessKey": ""
 	}
 }

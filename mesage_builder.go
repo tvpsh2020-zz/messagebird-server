@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -9,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/messagebird/go-rest-api/sms"
 	"github.com/tvpsh2020/messagebird-server/consts"
@@ -16,12 +16,12 @@ import (
 
 // IMessageBuilder is an interface for message builder
 type IMessageBuilder struct {
-	IRawMessage   *IRawMessage
-	Recipients    []string
-	Params        sms.Params
-	BodyLength    int
-	SplitParts    int
-	SplitPartSize int
+	IRawMessage       *IRawMessage
+	Recipients        []string
+	Params            sms.Params
+	BodyLength        int
+	SplitParts        int
+	ShouldConcatenate bool
 }
 
 var concatenatedSMSLength = map[string]int{
@@ -77,92 +77,112 @@ func (mb *IMessageBuilder) splitRecipients() error {
 	return nil
 }
 
-func (mb *IMessageBuilder) checkDataCoding() {
+func (mb *IMessageBuilder) checkBodyDataCoding() error {
+	mb.IRawMessage.Body = strings.TrimSpace(mb.IRawMessage.Body)
+
+	if len(mb.IRawMessage.Body) == 0 {
+		return errors.New("message content is illegal")
+	}
+
 	var regex = regexp.MustCompile(consts.GSM0338Regex)
 
 	for _, match := range regex.FindAllString(mb.IRawMessage.Body, -1) {
 		if len(match) > 0 {
 			mb.Params.DataCoding = consts.Unicode
 			log.Println("DataCoding: ", mb.Params.DataCoding)
-			return
+			return nil
 		}
 	}
 
 	mb.Params.DataCoding = consts.Plain
 
 	log.Println("DataCoding: ", mb.Params.DataCoding)
-}
-
-func (mb *IMessageBuilder) countBody() error {
-
-	mb.IRawMessage.Body = strings.TrimSpace(mb.IRawMessage.Body)
-
-	mb.BodyLength = len(mb.IRawMessage.Body)
-
-	if mb.BodyLength == 0 {
-		return errors.New("message content is illegal")
-	}
-
-	mb.checkDataCoding()
-
-	if mb.BodyLength > singleSMSLength[mb.Params.DataCoding] {
-		mb.SplitPartSize = concatenatedSMSLength[mb.Params.DataCoding]
-		mb.SplitParts = mb.BodyLength / mb.SplitPartSize
-
-		if mb.BodyLength%mb.SplitPartSize > 0 {
-			mb.SplitParts++
-		}
-	} else {
-		mb.SplitPartSize = singleSMSLength[mb.Params.DataCoding]
-		mb.SplitParts = 1
-	}
-
-	fmt.Println("Count -> ", mb.BodyLength)
 	return nil
 }
 
-func (mb *IMessageBuilder) stringToBinary(str string) string {
-	src := []byte(str)
-	encodedStr := hex.EncodeToString(src)
+func (mb *IMessageBuilder) countBodyLength() error {
+	switch mb.Params.DataCoding {
+	case consts.Plain:
+		mb.BodyLength = len(mb.IRawMessage.Body)
+	case consts.Unicode:
+		mb.BodyLength = utf8.RuneCountInString(mb.IRawMessage.Body)
+	default:
+		return errors.New("undefined data coding")
+	}
 
-	return encodedStr
+	if mb.BodyLength > singleSMSLength[mb.Params.DataCoding] {
+		mb.ShouldConcatenate = true
+	}
+
+	return nil
 }
 
-func (mb *IMessageBuilder) buildMessages() []IMessage {
-	var result []IMessage
-	rand.Seed(time.Now().UTC().UnixNano())
-	referenceNum := rand.Intn(256)
-
-	for i := 0; i < mb.SplitParts; i++ {
-		typeDetails := make(sms.TypeDetails)
-		typeDetails["udh"] = fmt.Sprintf("050003%02x%02x%02x", referenceNum, mb.SplitParts, i+1)
-
-		mb.Params.TypeDetails = typeDetails
-
-		_body := ""
-
-		if mb.SplitParts == 1 {
-			_body = mb.IRawMessage.Body
-		} else {
-			if len(mb.IRawMessage.Body[i*mb.SplitPartSize:]) < mb.SplitPartSize {
-				_body = mb.IRawMessage.Body[i*mb.SplitPartSize:]
-			} else {
-				_body = mb.IRawMessage.Body[i*mb.SplitPartSize : (i+1)*mb.SplitPartSize]
-			}
-		}
-
-		_result := &IMessage{
-			Originator: mb.IRawMessage.Originator,
-			// Body:       mb.stringToBinary(_body),
-			Body:       _body,
-			Recipients: mb.Recipients,
-			Params:     mb.Params,
-		}
-
-		result = append(result, *_result)
+func (mb *IMessageBuilder) makeSingleMessage(body string) IMessage {
+	result := IMessage{
+		Originator: mb.IRawMessage.Originator,
+		Body:       body,
+		Recipients: mb.Recipients,
+		Params:     mb.Params,
 	}
 
 	return result
+}
+
+func (mb *IMessageBuilder) countByDataCoding(rawSize int) int {
+	if mb.Params.DataCoding == consts.Unicode {
+		return 1
+	}
+
+	return rawSize
+}
+
+func (mb *IMessageBuilder) addTypeDetails(messages []IMessage) []IMessage {
+	rand.Seed(time.Now().UTC().UnixNano())
+	referenceNum := rand.Intn(256)
+
+	var resultMessages []IMessage
+
+	for i, message := range messages {
+		typeDetails := make(sms.TypeDetails)
+		typeDetails["udh"] = fmt.Sprintf("050003%02x%02x%02x", referenceNum, len(messages), i+1)
+
+		message.Params.TypeDetails = typeDetails
+		resultMessages = append(resultMessages, message)
+	}
+	fmt.Println("resultMessages -> ", resultMessages)
+	return resultMessages
+}
+
+func (mb *IMessageBuilder) buildMessagesV2() []IMessage {
+	var messages []IMessage
+	body := mb.IRawMessage.Body
+
+	if mb.ShouldConcatenate {
+		_buffer := ""
+		_count := 0
+
+		for len(body) > 0 {
+			_, _size := utf8.DecodeRuneInString(body)
+			_count += mb.countByDataCoding(_size)
+
+			if _count >= concatenatedSMSLength[mb.Params.DataCoding] {
+				log.Println("SEND => count -> ", _count, ", send -> ", string(_buffer))
+				messages = append(messages, mb.makeSingleMessage(_buffer))
+				_count = mb.countByDataCoding(_size)
+				_buffer = ""
+			}
+
+			_buffer += body[:_size]
+			body = body[_size:]
+		}
+
+		log.Println("SEND => count -> ", _count, ", send -> ", string(_buffer))
+		messages = append(messages, mb.makeSingleMessage(_buffer))
+	} else {
+		messages = append(messages, mb.makeSingleMessage(body))
+	}
+
+	return mb.addTypeDetails(messages)
 }
 
 func (mb *IMessageBuilder) start() ([]IMessage, error) {
@@ -174,9 +194,13 @@ func (mb *IMessageBuilder) start() ([]IMessage, error) {
 		return nil, err
 	}
 
-	if err := mb.countBody(); err != nil {
+	if err := mb.checkBodyDataCoding(); err != nil {
 		return nil, err
 	}
 
-	return mb.buildMessages(), nil
+	if err := mb.countBodyLength(); err != nil {
+		return nil, err
+	}
+
+	return mb.buildMessagesV2(), nil
 }

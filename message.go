@@ -34,7 +34,8 @@ var MessageQueue = new(IMessageQueue)
 
 func StoreMessageToQueue(rawMessage *IRawMessage) error {
 	messageBuilder := &IMessageBuilder{
-		IRawMessage: rawMessage,
+		IRawMessage:       rawMessage,
+		ShouldConcatenate: false,
 		Params: sms.Params{
 			Type:       "binary",
 			DataCoding: "",
