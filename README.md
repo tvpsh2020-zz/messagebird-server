@@ -11,9 +11,21 @@ Sending SMS by integrate MessageBird service.
 
 ## Installation
 
+Just doing this
+
 ```
 $ go get github.com/tvpsh2020/messagebird-server
 ```
+
+## Configuration
+
+Just doing this
+
+```
+$ cp config.json.default config.json
+```
+
+then you will be able to start testing this service with test API key.
 
 ## Usage
 
