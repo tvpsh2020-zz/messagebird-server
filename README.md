@@ -21,19 +21,71 @@ $ go get github.com/tvpsh2020/messagebird-server
 
 `POST /api/message`
 
-with body
-```
-- originator: Sender identity, this can be a telephone number (including country code) or an alphanumeric string. In case of an alphanumeric string, the maximum length is 11 characters.
-- body: The body of the SMS message, should not be empty.
-- recipients: Receivers, multiple receiver should be split with comma, any words other than number will be filter out.
-```
+body payload
 
-body example
+| Parameter  | Type   | Description |
+|------------|--------|-------------|
+| originator | string | Sender identity, this can be a telephone number (including country code) or an alphanumeric string. In case of an alphanumeric string, the maximum length is 11 characters. |
+| body       | string | The body of the SMS message, should not be empty. |
+| recipients | string | Receivers, multiple receiver should be split with comma, any words other than number will be filter out. |
+
+
+body payload example
+
 ```
 {
-	"originator": "12345678901",
-	"body": "\"abcd",
-	"recipients": "886987654321, +886987654321"
+    "originator": "12345678901",
+    "body": "Hello",
+    "recipients": "886987654321, +886987654321"
+}
+```
+correct response example, status code = 201
+
+```
+{
+    "result": "success",
+    "data": {
+        "message": "your message will be send if no bad things happen, please check server log"
+    }
+}
+```
+
+error response example, status code = 400
+
+```
+{
+    "result": "fail",
+    "data": {
+        "message": "message content cannot be empty"
+    }
+}
+```
+
+### 2. Get Balance
+
+`GET /api/balance`
+
+correct response example, status code = 200
+
+```
+{
+    "result": "success",
+    "data": {
+        "Payment": "prepaid",
+        "Type": "euros",
+        "Amount": 2.09
+    }
+}
+```
+
+error response example, status code = 400
+
+```
+{
+    "result": "fail",
+    "data": {
+        "message": "The MessageBird API returned an error"
+    }
 }
 ```
 
